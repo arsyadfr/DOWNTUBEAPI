@@ -22,7 +22,6 @@ pipenv==2022.1.8
 platformdirs==2.5.1
 pycryptodome==3.10.1
 pynput==1.7.1
-pypiwin32==223
 pytube==15.0.0
 scikit-learn==0.24.2
 scipy==1.6.3
