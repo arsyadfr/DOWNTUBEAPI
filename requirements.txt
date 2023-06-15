@@ -24,7 +24,6 @@ pycryptodome==3.10.1
 pynput==1.7.1
 pypiwin32==223
 pytube==15.0.0
-pywin32==300
 scikit-learn==0.24.2
 scipy==1.6.3
 selenium==3.141.0
