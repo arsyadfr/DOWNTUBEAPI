@@ -11,5 +11,13 @@
             "src": "/(.*)",
             "dest": "/"
         }
-    ]
+    ],
+    "projectSettings": {
+    "buildCommand": null,
+    "devCommand": null,
+    "framework": "nextjs",
+    "commandForIgnoringBuildStep": "",
+    "installCommand": null,
+    "outputDirectory": null
+},
 }
