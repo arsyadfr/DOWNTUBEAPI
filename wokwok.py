@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
-from pytube import YouTube
+import yt_dlp
 import requests
 
 app = Flask(__name__)
@@ -14,49 +14,65 @@ def text():
     return {"status": "online"}
 
 # =========================
-# PREVIEW VIDEO (thumbnail, title, direct url)
+# PREVIEW VIDEO
 # =========================
 @app.route("/dlv", methods=["POST"])
 def dlv():
     data = request.get_json(silent=True)
-
     if not data or "ytlink" not in data:
         return jsonify({"error": "ytlink missing"}), 400
 
     try:
-        yt = YouTube(data["ytlink"])
-        stream = yt.streams.get_highest_resolution()
+        url = data["ytlink"].split("&")[0]
+
+        ydl_opts = {
+            "quiet": True,
+            "skip_download": True,
+            "format": "best"
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
         return jsonify({
-            "videolink": stream.url,
-            "thumbnail": yt.thumbnail_url,
-            "title": yt.title
+            "videolink": info["url"],
+            "thumbnail": info.get("thumbnail"),
+            "title": info.get("title")
         })
 
     except Exception as e:
         print("DLV ERROR:", e)
-        return jsonify({"error": "failed to fetch video"}), 500
+        return jsonify({"error": "yt-dlp failed"}), 500
 
 # =========================
-# DOWNLOAD VIDEO (stream proxy)
+# DOWNLOAD VIDEO (STREAM)
 # =========================
 @app.route("/download", methods=["POST"])
 def download():
     data = request.get_json(silent=True)
-
     if not data or "ytlink" not in data:
         return jsonify({"error": "ytlink missing"}), 400
 
     try:
-        yt = YouTube(data["ytlink"])
-        stream = yt.streams.get_highest_resolution()
+        url = data["ytlink"].split("&")[0]
 
-        r = requests.get(stream.url, stream=True)
+        ydl_opts = {
+            "quiet": True,
+            "format": "best"
+        }
+
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        video_url = info["url"]
+        title = info.get("title", "video")
+
+        r = requests.get(video_url, stream=True)
 
         return Response(
             r.iter_content(chunk_size=1024 * 1024),
             headers={
-                "Content-Disposition": f'attachment; filename="{yt.title}.mp4"',
+                "Content-Disposition": f'attachment; filename="{title}.mp4"',
                 "Content-Type": "video/mp4"
             }
         )
