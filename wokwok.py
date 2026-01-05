@@ -1,6 +1,7 @@
 import os
 import uuid
 import shutil
+import re
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import yt_dlp
@@ -10,8 +11,16 @@ CORS(app)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TMP_DIR = os.path.join(BASE_DIR, "tmp")
-
 os.makedirs(TMP_DIR, exist_ok=True)
+
+
+# =========================
+# HEALTH CHECK
+# =========================
+@app.route("/text", methods=["GET"])
+def text():
+    return jsonify({"status": "online"})
+
 
 # =========================
 # FETCH INFO + THUMBNAIL
@@ -28,7 +37,7 @@ def dlv():
         ydl_opts = {
             "quiet": True,
             "skip_download": True,
-            "js_runtimes": ["node"]
+            "noplaylist": True,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -38,7 +47,7 @@ def dlv():
             "title": info.get("title"),
             "thumbnail": info.get("thumbnail"),
             "duration": info.get("duration"),
-            "uploader": info.get("uploader")
+            "uploader": info.get("uploader"),
         })
 
     except Exception as e:
@@ -65,7 +74,7 @@ def download():
             "format": "bestvideo+bestaudio/best",
             "merge_output_format": "mp4",
             "quiet": True,
-            "js_runtimes": ["node"]
+            "noplaylist": True,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -80,10 +89,14 @@ def download():
         if not final_file:
             return jsonify({"error": "file not found"}), 500
 
+        # sanitize filename
+        title = info.get("title", "video")
+        safe_title = re.sub(r'[^\w\s.-]', '', title)
+
         return send_file(
             final_file,
             as_attachment=True,
-            download_name=f"{info.get('title', 'video')}.mp4"
+            download_name=f"{safe_title}.mp4"
         )
 
     except Exception as e:
@@ -91,7 +104,7 @@ def download():
 
 
 # =========================
-# CLEANUP (OPTIONAL)
+# CLEANUP
 # =========================
 @app.route("/cleanup", methods=["POST"])
 def cleanup():
