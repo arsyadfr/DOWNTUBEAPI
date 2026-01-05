@@ -1,6 +1,5 @@
 import os
 import uuid
-import shutil
 import re
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
@@ -13,7 +12,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TMP_DIR = os.path.join(BASE_DIR, "tmp")
 os.makedirs(TMP_DIR, exist_ok=True)
 
-
 # =========================
 # HEALTH CHECK
 # =========================
@@ -23,7 +21,7 @@ def text():
 
 
 # =========================
-# FETCH INFO + THUMBNAIL
+# FETCH INFO
 # =========================
 @app.route("/dlv", methods=["POST"])
 def dlv():
@@ -55,7 +53,7 @@ def dlv():
 
 
 # =========================
-# DOWNLOAD VIDEO
+# DOWNLOAD MP3 (STABLE)
 # =========================
 @app.route("/download", methods=["POST"])
 def download():
@@ -67,51 +65,37 @@ def download():
             return jsonify({"error": "ytlink required"}), 400
 
         uid = str(uuid.uuid4())
-        outtmpl = os.path.join(TMP_DIR, f"{uid}.%(ext)s")
+        outtmpl = os.path.join(TMP_DIR, uid)
 
         ydl_opts = {
             "outtmpl": outtmpl,
-            "format": "bestvideo+bestaudio/best",
-            "merge_output_format": "mp4",
+            "format": "bestaudio/best",
             "quiet": True,
             "noplaylist": True,
+            "postprocessors": [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": "mp3",
+                "preferredquality": "192",
+            }],
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
-        final_file = None
-        for f in os.listdir(TMP_DIR):
-            if f.startswith(uid):
-                final_file = os.path.join(TMP_DIR, f)
-                break
+        final_file = f"{outtmpl}.mp3"
 
-        if not final_file:
-            return jsonify({"error": "file not found"}), 500
+        if not os.path.exists(final_file):
+            return jsonify({"error": "mp3 not found"}), 500
 
-        # sanitize filename
-        title = info.get("title", "video")
+        title = info.get("title", "audio")
         safe_title = re.sub(r'[^\w\s.-]', '', title)
 
         return send_file(
             final_file,
             as_attachment=True,
-            download_name=f"{safe_title}.mp4"
+            download_name=f"{safe_title}.mp3"
         )
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-# =========================
-# CLEANUP
-# =========================
-@app.route("/cleanup", methods=["POST"])
-def cleanup():
-    try:
-        shutil.rmtree(TMP_DIR)
-        os.makedirs(TMP_DIR, exist_ok=True)
-        return jsonify({"status": "cleaned"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
