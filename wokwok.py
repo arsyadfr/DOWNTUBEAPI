@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
 import yt_dlp
 import requests
+import re
 
 app = Flask(__name__)
 CORS(app)
@@ -16,6 +17,13 @@ def text():
 # =========================
 # PREVIEW VIDEO
 # =========================
+
+def safe_filename(name):
+    name = name.replace("“", '"').replace("”", '"')
+    name = name.replace("‘", "'").replace("’", "'")
+    name = re.sub(r'[\\/:*?"<>|]', '', name)
+    return name.strip()
+    
 @app.route("/dlv", methods=["POST"])
 def dlv():
     data = request.get_json(silent=True)
@@ -56,16 +64,11 @@ def download():
     try:
         url = data["ytlink"].split("&")[0]
 
-        ydl_opts = {
-            "quiet": True,
-            "format": "best"
-        }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL({"quiet": True, "format": "best"}) as ydl:
             info = ydl.extract_info(url, download=False)
 
         video_url = info["url"]
-        title = info.get("title", "video")
+        title = safe_filename(info.get("title", "video"))
 
         r = requests.get(video_url, stream=True)
 
